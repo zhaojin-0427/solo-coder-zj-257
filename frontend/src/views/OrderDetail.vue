@@ -8,8 +8,11 @@
         订单详情 · {{ order?.orderNo }}
       </h2>
       <div>
-        <el-tag v-if="order" :type="statusType(order.status)" size="large">
+        <el-tag v-if="order" :type="statusType(order.status)" size="large" style="margin-right: 8px">
           {{ statusLabel(order.status) }}
+        </el-tag>
+        <el-tag v-if="order && scheduleType(order.scheduleStatus)" :type="scheduleType(order.scheduleStatus)" size="large" effect="dark">
+          {{ scheduleLabel(order.scheduleStatus) }}
         </el-tag>
       </div>
     </div>
@@ -52,9 +55,43 @@
               :key="step.id"
               :title="step.stepName"
               :status="step.completed ? 'success' : (idx === activeStep ? 'process' : 'wait')"
+              :class="{ 'step-overdue': isOverdue(step) && !step.completed }"
             >
               <template #description>
-                <div v-if="step.completed" style="font-size: 12px; color: #67c23a">
+                <div style="margin-top: 8px">
+                  <el-row :gutter="8">
+                    <el-col :span="12">
+                      <div class="craft-info">
+                        <span class="info-label">计划开始:</span>
+                        <span class="info-value">{{ step.plannedStartDate ? formatDateOnly(step.plannedStartDate) : '未设置' }}</span>
+                      </div>
+                    </el-col>
+                    <el-col :span="12">
+                      <div class="craft-info">
+                        <span class="info-label">计划结束:</span>
+                        <span class="info-value" :class="{ 'text-danger': isOverdue(step) && !step.completed }">
+                          {{ step.plannedEndDate ? formatDateOnly(step.plannedEndDate) : '未设置' }}
+                          <span v-if="isOverdue(step) && !step.completed" style="margin-left: 4px">⚠️ 已逾期</span>
+                        </span>
+                      </div>
+                    </el-col>
+                  </el-row>
+                  <el-row :gutter="8" style="margin-top: 4px">
+                    <el-col :span="12">
+                      <div class="craft-info">
+                        <span class="info-label">负责人:</span>
+                        <span class="info-value">{{ step.assignee || '未分配' }}</span>
+                      </div>
+                    </el-col>
+                    <el-col :span="12" v-if="step.blockingReason && !step.completed">
+                      <div class="craft-info">
+                        <span class="info-label">阻塞原因:</span>
+                        <span class="info-value text-danger">{{ step.blockingReason }}</span>
+                      </div>
+                    </el-col>
+                  </el-row>
+                </div>
+                <div v-if="step.completed" style="font-size: 12px; color: #67c23a; margin-top: 6px">
                   ✅ 完成于 {{ formatDate(step.completedAt!) }}
                 </div>
                 <div v-if="step.difficulty" style="font-size: 12px; color: #e6a23c; margin-top: 4px">
@@ -81,7 +118,7 @@
                     撤销完成
                   </el-button>
                   <el-button size="small" type="warning" @click="editStep(step)">
-                    编辑备注
+                    编辑排期/备注
                   </el-button>
                 </div>
               </template>
@@ -132,8 +169,37 @@
       </el-col>
     </el-row>
 
-    <el-dialog v-model="showStepEdit" title="编辑工序" width="400px">
-      <el-form :model="stepForm" label-width="80px">
+    <el-dialog v-model="showStepEdit" title="编辑工序排期与备注" width="500px">
+      <el-form :model="stepForm" label-width="100px">
+        <el-form-item label="计划开始">
+          <el-date-picker
+            v-model="stepForm.plannedStartDate"
+            type="date"
+            placeholder="选择计划开始日期"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="计划结束">
+          <el-date-picker
+            v-model="stepForm.plannedEndDate"
+            type="date"
+            placeholder="选择计划结束日期"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="负责人">
+          <el-input v-model="stepForm.assignee" placeholder="请输入负责人姓名" />
+        </el-form-item>
+        <el-form-item label="阻塞原因" v-if="!editingStep?.completed">
+          <el-input
+            v-model="stepForm.blockingReason"
+            type="textarea"
+            :rows="2"
+            placeholder="若工序被阻塞，请填写阻塞原因"
+          />
+        </el-form-item>
         <el-form-item label="工艺难点">
           <el-input v-model="stepForm.difficulty" type="textarea" :rows="2" />
         </el-form-item>
@@ -161,7 +227,14 @@ const order = ref<any>(null);
 const materialList = ref<any>(null);
 const showStepEdit = ref(false);
 const editingStep = ref<any>(null);
-const stepForm = ref({ difficulty: '', notes: '' });
+const stepForm = ref({
+  difficulty: '',
+  notes: '',
+  plannedStartDate: '',
+  plannedEndDate: '',
+  assignee: '',
+  blockingReason: '',
+});
 const acceptForm = ref({ craftsmanshipRating: 5, comment: '' });
 
 const activeStep = computed(() => {
@@ -183,6 +256,14 @@ const statusType = (s: string) => ({
   pending: 'info', designing: 'warning', producing: 'primary', completed: 'success', accepted: '',
 }[s] || '');
 
+const scheduleLabel = (s: string) => ({
+  overdue: '🚨 工序逾期', near: '⏰ 临近交付', normal: '',
+}[s] || '');
+
+const scheduleType = (s: string) => ({
+  overdue: 'danger', near: 'warning', normal: '',
+}[s] || '');
+
 const complexityLabel = (c: string) => ({
   simple: '简单', medium: '普通', complex: '复杂', master: '大师级',
 }[c] || c);
@@ -192,6 +273,15 @@ const complexityType = (c: string) => ({
 }[c] || '');
 
 const formatDate = (d: string) => new Date(d).toLocaleString('zh-CN');
+const formatDateOnly = (d: string) => {
+  const dt = new Date(d);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+};
+
+const isOverdue = (step: any) => {
+  if (!step.plannedEndDate || step.completed) return false;
+  return new Date(step.plannedEndDate).getTime() < new Date().getTime();
+};
 
 const toggleStep = async (step: any, completed: boolean) => {
   await orderApi.updateCraft(order.value.id, step.id, { completed });
@@ -201,12 +291,31 @@ const toggleStep = async (step: any, completed: boolean) => {
 
 const editStep = (step: any) => {
   editingStep.value = step;
-  stepForm.value = { difficulty: step.difficulty || '', notes: step.notes || '' };
+  stepForm.value = {
+    difficulty: step.difficulty || '',
+    notes: step.notes || '',
+    plannedStartDate: step.plannedStartDate ? formatDateOnly(step.plannedStartDate) : '',
+    plannedEndDate: step.plannedEndDate ? formatDateOnly(step.plannedEndDate) : '',
+    assignee: step.assignee || '',
+    blockingReason: step.blockingReason || '',
+  };
   showStepEdit.value = true;
 };
 
 const saveStep = async () => {
-  await orderApi.updateCraft(order.value.id, editingStep.value.id, stepForm.value);
+  const payload: any = {
+    difficulty: stepForm.value.difficulty || undefined,
+    notes: stepForm.value.notes || undefined,
+    assignee: stepForm.value.assignee || undefined,
+    blockingReason: stepForm.value.blockingReason || undefined,
+  };
+  if (stepForm.value.plannedStartDate) {
+    payload.plannedStartDate = new Date(stepForm.value.plannedStartDate).toISOString();
+  }
+  if (stepForm.value.plannedEndDate) {
+    payload.plannedEndDate = new Date(stepForm.value.plannedEndDate).toISOString();
+  }
+  await orderApi.updateCraft(order.value.id, editingStep.value.id, payload);
   ElMessage.success('保存成功');
   showStepEdit.value = false;
   fetchData();
@@ -220,3 +329,26 @@ const submitAccept = async () => {
 
 onMounted(fetchData);
 </script>
+
+<style scoped>
+.craft-info {
+  font-size: 12px;
+  color: #666;
+  line-height: 1.6;
+}
+.info-label {
+  color: #999;
+  margin-right: 4px;
+}
+.info-value {
+  color: #333;
+}
+.text-danger {
+  color: #f56c6c;
+  font-weight: 500;
+}
+.step-overdue :deep(.el-step__title) {
+  color: #f56c6c !important;
+  font-weight: 600;
+}
+</style>

@@ -10,6 +10,17 @@ export interface CraftRecord {
   completedAt?: string;
   difficulty?: string;
   notes?: string;
+  plannedStartDate?: string;
+  plannedEndDate?: string;
+  assignee?: string;
+  blockingReason?: string;
+}
+
+export type ScheduleStatus = 'overdue' | 'near' | 'normal';
+
+export interface OrderWithSchedule extends Order {
+  scheduleStatus: ScheduleStatus;
+  overdueCraftCount: number;
 }
 
 export interface Order {
@@ -67,12 +78,12 @@ export class OrdersService {
         estimatedDelivery: new Date(now.getTime() + 10 * 24 * 3600 * 1000).toISOString(),
         tenonDiagramIds: [],
         craftRecords: [
-          { id: 'c1', stepName: '选料开料', completed: true, completedAt: new Date(now.getTime() - 18 * 24 * 3600 * 1000).toISOString(), notes: '精选海南黄花梨老料' },
-          { id: 'c2', stepName: '干燥处理', completed: true, completedAt: new Date(now.getTime() - 12 * 24 * 3600 * 1000).toISOString(), difficulty: '自然阴干需严格控制温湿度', notes: '阴干15天' },
-          { id: 'c3', stepName: '开榫凿眼', completed: true, completedAt: new Date(now.getTime() - 6 * 24 * 3600 * 1000).toISOString(), difficulty: '楔钉榫对接精度要求高' },
-          { id: 'c4', stepName: '试装拼合', completed: false, notes: '需确保各部件严丝合缝' },
-          { id: 'c5', stepName: '打磨上漆', completed: false },
-          { id: 'c6', stepName: '整体修整', completed: false },
+          { id: 'c1', stepName: '选料开料', completed: true, completedAt: new Date(now.getTime() - 18 * 24 * 3600 * 1000).toISOString(), notes: '精选海南黄花梨老料', plannedStartDate: new Date(now.getTime() - 19 * 24 * 3600 * 1000).toISOString(), plannedEndDate: new Date(now.getTime() - 17 * 24 * 3600 * 1000).toISOString(), assignee: '张木匠' },
+          { id: 'c2', stepName: '干燥处理', completed: true, completedAt: new Date(now.getTime() - 12 * 24 * 3600 * 1000).toISOString(), difficulty: '自然阴干需严格控制温湿度', notes: '阴干15天', plannedStartDate: new Date(now.getTime() - 17 * 24 * 3600 * 1000).toISOString(), plannedEndDate: new Date(now.getTime() - 13 * 24 * 3600 * 1000).toISOString(), assignee: '李木匠' },
+          { id: 'c3', stepName: '开榫凿眼', completed: true, completedAt: new Date(now.getTime() - 6 * 24 * 3600 * 1000).toISOString(), difficulty: '楔钉榫对接精度要求高', plannedStartDate: new Date(now.getTime() - 12 * 24 * 3600 * 1000).toISOString(), plannedEndDate: new Date(now.getTime() - 7 * 24 * 3600 * 1000).toISOString(), assignee: '王木匠' },
+          { id: 'c4', stepName: '试装拼合', completed: false, notes: '需确保各部件严丝合缝', plannedStartDate: new Date(now.getTime() - 6 * 24 * 3600 * 1000).toISOString(), plannedEndDate: new Date(now.getTime() - 2 * 24 * 3600 * 1000).toISOString(), assignee: '张木匠', blockingReason: '等待楔钉榫配件到货' },
+          { id: 'c5', stepName: '打磨上漆', completed: false, plannedStartDate: new Date(now.getTime() + 1 * 24 * 3600 * 1000).toISOString(), plannedEndDate: new Date(now.getTime() + 4 * 24 * 3600 * 1000).toISOString(), assignee: '赵木匠' },
+          { id: 'c6', stepName: '整体修整', completed: false, plannedStartDate: new Date(now.getTime() + 5 * 24 * 3600 * 1000).toISOString(), plannedEndDate: new Date(now.getTime() + 9 * 24 * 3600 * 1000).toISOString(), assignee: '王木匠' },
         ],
       },
       {
@@ -92,12 +103,12 @@ export class OrdersService {
         actualDelivery: new Date(now.getTime() - 3 * 24 * 3600 * 1000).toISOString(),
         tenonDiagramIds: [],
         craftRecords: [
-          { id: 'd1', stepName: '选料开料', completed: true, completedAt: new Date(now.getTime() - 58 * 24 * 3600 * 1000).toISOString() },
-          { id: 'd2', stepName: '干燥处理', completed: true, completedAt: new Date(now.getTime() - 45 * 24 * 3600 * 1000).toISOString() },
-          { id: 'd3', stepName: '开榫凿眼', completed: true, completedAt: new Date(now.getTime() - 30 * 24 * 3600 * 1000).toISOString(), difficulty: '霸王枨安装需经验丰富' },
-          { id: 'd4', stepName: '试装拼合', completed: true, completedAt: new Date(now.getTime() - 15 * 24 * 3600 * 1000).toISOString() },
-          { id: 'd5', stepName: '打磨上漆', completed: true, completedAt: new Date(now.getTime() - 7 * 24 * 3600 * 1000).toISOString() },
-          { id: 'd6', stepName: '整体修整', completed: true, completedAt: new Date(now.getTime() - 3 * 24 * 3600 * 1000).toISOString() },
+          { id: 'd1', stepName: '选料开料', completed: true, completedAt: new Date(now.getTime() - 58 * 24 * 3600 * 1000).toISOString(), plannedStartDate: new Date(now.getTime() - 59 * 24 * 3600 * 1000).toISOString(), plannedEndDate: new Date(now.getTime() - 57 * 24 * 3600 * 1000).toISOString(), assignee: '张木匠' },
+          { id: 'd2', stepName: '干燥处理', completed: true, completedAt: new Date(now.getTime() - 45 * 24 * 3600 * 1000).toISOString(), plannedStartDate: new Date(now.getTime() - 56 * 24 * 3600 * 1000).toISOString(), plannedEndDate: new Date(now.getTime() - 46 * 24 * 3600 * 1000).toISOString(), assignee: '李木匠' },
+          { id: 'd3', stepName: '开榫凿眼', completed: true, completedAt: new Date(now.getTime() - 30 * 24 * 3600 * 1000).toISOString(), difficulty: '霸王枨安装需经验丰富', plannedStartDate: new Date(now.getTime() - 45 * 24 * 3600 * 1000).toISOString(), plannedEndDate: new Date(now.getTime() - 31 * 24 * 3600 * 1000).toISOString(), assignee: '王木匠' },
+          { id: 'd4', stepName: '试装拼合', completed: true, completedAt: new Date(now.getTime() - 15 * 24 * 3600 * 1000).toISOString(), plannedStartDate: new Date(now.getTime() - 30 * 24 * 3600 * 1000).toISOString(), plannedEndDate: new Date(now.getTime() - 16 * 24 * 3600 * 1000).toISOString(), assignee: '张木匠' },
+          { id: 'd5', stepName: '打磨上漆', completed: true, completedAt: new Date(now.getTime() - 7 * 24 * 3600 * 1000).toISOString(), plannedStartDate: new Date(now.getTime() - 15 * 24 * 3600 * 1000).toISOString(), plannedEndDate: new Date(now.getTime() - 8 * 24 * 3600 * 1000).toISOString(), assignee: '赵木匠' },
+          { id: 'd6', stepName: '整体修整', completed: true, completedAt: new Date(now.getTime() - 3 * 24 * 3600 * 1000).toISOString(), plannedStartDate: new Date(now.getTime() - 7 * 24 * 3600 * 1000).toISOString(), plannedEndDate: new Date(now.getTime() - 4 * 24 * 3600 * 1000).toISOString(), assignee: '王木匠' },
         ],
         craftsmanshipRating: 5,
         customerComment: '工艺精湛，紫檀画案做工一丝不苟，霸王枨结构稳固美观，非常满意！',
@@ -115,6 +126,7 @@ export class OrdersService {
         status: 'designing',
         createdAt: new Date(now.getTime() - 2 * 24 * 3600 * 1000).toISOString(),
         updatedAt: new Date(now.getTime() - 1 * 24 * 3600 * 1000).toISOString(),
+        estimatedDelivery: new Date(now.getTime() + 3 * 24 * 3600 * 1000).toISOString(),
         tenonDiagramIds: [],
         craftRecords: [],
       },
@@ -122,16 +134,73 @@ export class OrdersService {
     this.orders = sampleOrders;
   }
 
-  findAll(): Order[] {
-    return this.orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  static readonly NEAR_DELIVERY_DAYS = 7;
+  static readonly NEAR_DELIVERY_THRESHOLD_DAYS = 7;
+
+  computeOverdueCraftCount(order: Order): number {
+    const now = new Date();
+    return order.craftRecords.filter((c) => {
+      if (c.completed || !c.plannedEndDate) return false;
+      return new Date(c.plannedEndDate).getTime() < now.getTime();
+    }).length;
   }
 
-  findOne(id: string): Order {
+  computeScheduleStatus(order: Order): ScheduleStatus {
+    if (order.status === 'completed' || order.status === 'accepted') return 'normal';
+    if (this.computeOverdueCraftCount(order) > 0) return 'overdue';
+    if (order.estimatedDelivery) {
+      const daysLeft = Math.ceil(
+        (new Date(order.estimatedDelivery).getTime() - new Date().getTime()) /
+          (24 * 3600 * 1000),
+      );
+      if (daysLeft >= 0 && daysLeft <= OrdersService.NEAR_DELIVERY_THRESHOLD_DAYS) return 'near';
+    }
+    return 'normal';
+  }
+
+  computeCraftDurationDays(craft: CraftRecord): number | null {
+    if (!craft.completed && craft.plannedStartDate && craft.plannedEndDate) {
+      return Math.ceil(
+        (new Date(craft.plannedEndDate).getTime() -
+          new Date(craft.plannedStartDate).getTime()) /
+          (24 * 3600 * 1000),
+      );
+    }
+    if (craft.completed && craft.completedAt && craft.plannedStartDate) {
+      return Math.ceil(
+        (new Date(craft.completedAt).getTime() -
+          new Date(craft.plannedStartDate).getTime()) /
+          (24 * 3600 * 1000),
+      );
+    }
+    return null;
+  }
+
+  enrichWithSchedule(order: Order): OrderWithSchedule {
+    return {
+      ...order,
+      scheduleStatus: this.computeScheduleStatus(order),
+      overdueCraftCount: this.computeOverdueCraftCount(order),
+    };
+  }
+
+  findAll(scheduleStatus?: ScheduleStatus): OrderWithSchedule[] {
+    const sorted = this.orders.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+    const enriched = sorted.map((o) => this.enrichWithSchedule(o));
+    if (scheduleStatus) {
+      return enriched.filter((o) => o.scheduleStatus === scheduleStatus);
+    }
+    return enriched;
+  }
+
+  findOne(id: string): OrderWithSchedule {
     const order = this.orders.find((o) => o.id === id);
     if (!order) {
       throw new NotFoundException(`订单 ${id} 不存在`);
     }
-    return order;
+    return this.enrichWithSchedule(order);
   }
 
   create(dto: CreateOrderDto): Order {

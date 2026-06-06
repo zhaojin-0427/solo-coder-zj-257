@@ -1,14 +1,15 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, Patch, Query } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto, UpdateOrderStatusDto, AcceptOrderDto } from './orders.dto';
+import { ScheduleStatus } from './orders.service';
 
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Get()
-  findAll() {
-    return this.ordersService.findAll();
+  findAll(@Query('scheduleStatus') scheduleStatus?: ScheduleStatus) {
+    return this.ordersService.findAll(scheduleStatus);
   }
 
   @Get(':id')

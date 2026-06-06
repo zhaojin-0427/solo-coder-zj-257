@@ -15,7 +15,8 @@ request.interceptors.response.use(
 );
 
 export const orderApi = {
-  list: () => request.get('/orders'),
+  list: (scheduleStatus?: string) =>
+    request.get('/orders', { params: scheduleStatus ? { scheduleStatus } : undefined }),
   detail: (id: string) => request.get(`/orders/${id}`),
   create: (data: any) => request.post('/orders', data),
   updateStatus: (id: string, status: string) =>

@@ -5,37 +5,51 @@
     </div>
 
     <el-row :gutter="16" style="margin-bottom: 16px">
-      <el-col :span="4">
+      <el-col :span="3">
         <div class="stat-card wood-card">
           <div class="stat-label">订单总数</div>
           <div class="stat-value">{{ data?.overview?.totalOrders || 0 }}</div>
         </div>
       </el-col>
-      <el-col :span="4">
+      <el-col :span="3">
         <div class="stat-card wood-card">
           <div class="stat-label">待处理</div>
           <div class="stat-value warning">{{ data?.overview?.pendingOrders || 0 }}</div>
         </div>
       </el-col>
-      <el-col :span="4">
+      <el-col :span="3">
         <div class="stat-card wood-card">
           <div class="stat-label">进行中</div>
           <div class="stat-value primary">{{ data?.overview?.producingOrders || 0 }}</div>
         </div>
       </el-col>
-      <el-col :span="4">
+      <el-col :span="3">
         <div class="stat-card wood-card">
           <div class="stat-label">已完成</div>
           <div class="stat-value success">{{ data?.overview?.completedOrders || 0 }}</div>
         </div>
       </el-col>
-      <el-col :span="4">
+      <el-col :span="3">
+        <div class="stat-card wood-card">
+          <div class="stat-label">🚨 工序逾期</div>
+          <div class="stat-value danger">{{ data?.overview?.overdueCraftCount || 0 }}</div>
+        </div>
+      </el-col>
+      <el-col :span="3">
+        <div class="stat-card wood-card">
+          <div class="stat-label">平均工序时长</div>
+          <div class="stat-value">
+            {{ data?.overview?.avgCraftDuration || 0 }}<span style="font-size: 14px"> 天</span>
+          </div>
+        </div>
+      </el-col>
+      <el-col :span="3">
         <div class="stat-card wood-card">
           <div class="stat-label">平均交付周期</div>
           <div class="stat-value">{{ data?.overview?.avgDeliveryCycle || 0 }}<span style="font-size: 14px"> 天</span></div>
         </div>
       </el-col>
-      <el-col :span="4">
+      <el-col :span="3">
         <div class="stat-card wood-card">
           <div class="stat-label">客户满意度</div>
           <div class="stat-value success">
@@ -76,6 +90,39 @@
     </el-row>
 
     <div class="wood-card" style="margin-top: 16px">
+      <h3 class="chart-title">⏰ 临近交付订单列表</h3>
+      <el-table :data="data?.nearDeliveryOrders || []" stripe>
+        <el-table-column prop="orderNo" label="订单号" width="140" />
+        <el-table-column prop="furnitureName" label="家具名称" width="160" />
+        <el-table-column prop="customerName" label="客户" width="120" />
+        <el-table-column label="预计交付" width="160">
+          <template #default="{ row }">
+            <span class="text-warning">
+              {{ row.estimatedDelivery ? formatDateOnly(row.estimatedDelivery) : '-' }}
+            </span>
+            <div style="font-size: 11px; color: #e6a23c">
+              {{ deliveryDaysText(row) }}
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="逾期工序" width="120" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.overdueCraftCount > 0" type="danger" size="small">
+              {{ row.overdueCraftCount }} 道
+            </el-tag>
+            <span v-else style="color: #67c23a">0</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="100" align="center">
+          <template #default="{ row }">
+            <el-button type="primary" link @click="goOrder(row.id)">查看详情</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-if="!data?.nearDeliveryOrders?.length" description="暂无临近交付的订单" :image-size="60" />
+    </div>
+
+    <div class="wood-card" style="margin-top: 16px">
       <h3 class="chart-title">💬 客户评价列表</h3>
       <el-table :data="data?.satisfaction?.ratings || []" stripe>
         <el-table-column prop="orderNo" label="订单号" width="140" />
@@ -93,10 +140,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick, watch } from 'vue';
+import { ref, onMounted, nextTick } from 'vue';
+import { useRouter } from 'vue-router';
 import * as echarts from 'echarts';
 import { statisticsApi } from '@/api';
 
+const router = useRouter();
 const data = ref<any>(null);
 const woodChartRef = ref<HTMLElement>();
 const tenonChartRef = ref<HTMLElement>();
@@ -104,6 +153,23 @@ const deliveryChartRef = ref<HTMLElement>();
 const satisfactionChartRef = ref<HTMLElement>();
 
 const woodColors = ['#8b5a2b', '#a67c52', '#6b4226', '#c9a066', '#8b6914', '#5c4033', '#8b4513', '#cd853f'];
+
+const formatDateOnly = (d: string) => {
+  const dt = new Date(d);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+};
+
+const deliveryDaysText = (row: any) => {
+  if (!row.estimatedDelivery) return '';
+  const days = Math.ceil(
+    (new Date(row.estimatedDelivery).getTime() - new Date().getTime()) / (24 * 3600 * 1000),
+  );
+  if (days < 0) return `已逾期 ${Math.abs(days)} 天`;
+  if (days === 0) return '今日到期';
+  return `剩余 ${days} 天`;
+};
+
+const goOrder = (id: string) => router.push(`/orders/${id}`);
 
 const initCharts = () => {
   if (!data.value) return;
@@ -298,7 +364,7 @@ onMounted(async () => {
 <style scoped>
 .stat-card {
   text-align: center;
-  padding: 20px 12px;
+  padding: 20px 8px;
 }
 .stat-label {
   font-size: 13px;
@@ -319,6 +385,9 @@ onMounted(async () => {
 .stat-value.warning {
   color: #e6a23c;
 }
+.stat-value.danger {
+  color: #f56c6c;
+}
 .chart-card {
   padding: 20px;
 }
@@ -333,5 +402,9 @@ onMounted(async () => {
 .chart {
   width: 100%;
   height: 320px;
+}
+.text-warning {
+  color: #e6a23c;
+  font-weight: 600;
 }
 </style>

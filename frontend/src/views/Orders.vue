@@ -16,6 +16,11 @@
           <el-option label="已完工" value="completed" />
           <el-option label="已验收" value="accepted" />
         </el-select>
+        <el-select v-model="scheduleFilter" placeholder="排期状态" clearable style="width: 180px">
+          <el-option label="🚨 逾期" value="overdue" />
+          <el-option label="⏰ 临近交付" value="near" />
+          <el-option label="✅ 正常" value="normal" />
+        </el-select>
         <el-input
           v-model="searchText"
           placeholder="搜索订单号 / 客户 / 家具"
@@ -24,7 +29,30 @@
         />
       </div>
 
-      <el-table :data="filteredOrders" style="width: 100%" stripe>
+      <el-table :data="filteredOrders" style="width: 100%" stripe :row-class-name="rowClassName">
+        <el-table-column label="排期预警" width="120" fixed="left">
+          <template #default="{ row }">
+            <el-tag
+              v-if="row.scheduleStatus === 'overdue'"
+              type="danger"
+              effect="dark"
+              size="large"
+            >
+              🚨 逾期
+            </el-tag>
+            <el-tag
+              v-else-if="row.scheduleStatus === 'near'"
+              type="warning"
+              effect="dark"
+              size="large"
+            >
+              ⏰ 临近
+            </el-tag>
+            <el-tag v-else type="success" size="small">
+              正常
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="orderNo" label="订单号" width="140" />
         <el-table-column label="客户信息" width="180">
           <template #default="{ row }">
@@ -49,6 +77,24 @@
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="statusType(row.status)">{{ statusLabel(row.status) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="预计交付" width="150">
+          <template #default="{ row }">
+            <span :class="{ 'text-danger': isDeliveryNearOrOverdue(row) }">
+              {{ row.estimatedDelivery ? formatDateOnly(row.estimatedDelivery) : '-' }}
+            </span>
+            <div v-if="row.estimatedDelivery" style="font-size: 11px; color: #888">
+              {{ deliveryDaysText(row) }}
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="逾期工序" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.overdueCraftCount > 0" type="danger">
+              {{ row.overdueCraftCount }}
+            </el-tag>
+            <span v-else style="color: #67c23a">0</span>
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="创建时间" width="170">
@@ -156,6 +202,7 @@ import { orderApi } from '@/api';
 const router = useRouter();
 const orders = ref<any[]>([]);
 const statusFilter = ref('');
+const scheduleFilter = ref('');
 const searchText = ref('');
 const showCreate = ref(false);
 const formRef = ref<FormInstance>();
@@ -176,6 +223,7 @@ const form = ref({
 const filteredOrders = computed(() => {
   return orders.value.filter((o) => {
     if (statusFilter.value && o.status !== statusFilter.value) return false;
+    if (scheduleFilter.value && o.scheduleStatus !== scheduleFilter.value) return false;
     if (searchText.value) {
       const s = searchText.value.toLowerCase();
       return (
@@ -187,6 +235,12 @@ const filteredOrders = computed(() => {
     return true;
   });
 });
+
+const rowClassName = ({ row }: { row: any }) => {
+  if (row.scheduleStatus === 'overdue') return 'row-overdue';
+  if (row.scheduleStatus === 'near') return 'row-near';
+  return '';
+};
 
 const fetchOrders = async () => {
   orders.value = await orderApi.list();
@@ -223,6 +277,24 @@ const complexityType = (c: string) => ({
 }[c] || '');
 
 const formatDate = (d: string) => new Date(d).toLocaleString('zh-CN');
+const formatDateOnly = (d: string) => {
+  const dt = new Date(d);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+};
+
+const isDeliveryNearOrOverdue = (row: any) => {
+  return row.scheduleStatus === 'overdue' || row.scheduleStatus === 'near';
+};
+
+const deliveryDaysText = (row: any) => {
+  if (!row.estimatedDelivery) return '';
+  const days = Math.ceil(
+    (new Date(row.estimatedDelivery).getTime() - new Date().getTime()) / (24 * 3600 * 1000),
+  );
+  if (days < 0) return `已逾期 ${Math.abs(days)} 天`;
+  if (days === 0) return '今日到期';
+  return `剩余 ${days} 天`;
+};
 
 const goDetail = (id: string) => router.push(`/orders/${id}`);
 
@@ -267,5 +339,21 @@ onMounted(fetchOrders);
   display: flex;
   gap: 12px;
   margin-bottom: 16px;
+}
+.text-danger {
+  color: #f56c6c;
+  font-weight: 600;
+}
+:deep(.row-overdue) {
+  background-color: #fef0f0 !important;
+}
+:deep(.row-overdue:hover > td) {
+  background-color: #fde2e2 !important;
+}
+:deep(.row-near) {
+  background-color: #fdf6ec !important;
+}
+:deep(.row-near:hover > td) {
+  background-color: #faecd8 !important;
 }
 </style>

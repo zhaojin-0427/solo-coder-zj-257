@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { OrdersService } from '../orders/orders.service';
 import { MaterialsService } from '../materials/materials.service';
 import { TenonsService } from '../tenons/tenons.service';
+import { OrderWithSchedule, CraftRecord } from '../orders/orders.service';
 
 @Injectable()
 export class StatisticsService {
@@ -84,6 +85,48 @@ export class StatisticsService {
       count: satisfactionRatings.filter((r) => r.rating === star).length,
     }));
 
+    const overdueCraftCount = orders.reduce(
+      (sum, o) => sum + this.ordersService.computeOverdueCraftCount(o),
+      0,
+    );
+
+    const craftDurations: number[] = [];
+    orders.forEach((o) => {
+      o.craftRecords.forEach((c) => {
+        const d = this.ordersService.computeCraftDurationDays(c);
+        if (d !== null && d >= 0) craftDurations.push(d);
+      });
+    });
+    const avgCraftDuration =
+      craftDurations.length > 0
+        ? Math.round(craftDurations.reduce((s, d) => s + d, 0) / craftDurations.length)
+        : 0;
+
+    const nearDeliveryOrders: Array<{
+      id: string;
+      orderNo: string;
+      furnitureName: string;
+      customerName: string;
+      estimatedDelivery?: string;
+      daysLeft: number;
+      overdueCraftCount: number;
+    }> = orders
+      .filter((o) => o.scheduleStatus === 'near')
+      .map((o) => ({
+        id: o.id,
+        orderNo: o.orderNo,
+        furnitureName: o.furnitureName,
+        customerName: o.customerName,
+        estimatedDelivery: o.estimatedDelivery,
+        daysLeft: o.estimatedDelivery
+          ? Math.ceil(
+              (new Date(o.estimatedDelivery).getTime() - new Date().getTime()) /
+                (24 * 3600 * 1000),
+            )
+          : 0,
+        overdueCraftCount: o.overdueCraftCount,
+      }));
+
     return {
       overview: {
         totalOrders,
@@ -93,6 +136,8 @@ export class StatisticsService {
         totalRevenue,
         avgDeliveryCycle,
         avgSatisfaction,
+        overdueCraftCount,
+        avgCraftDuration,
       },
       woodConsumptionTrend: woodTrend,
       tenonFrequency,
@@ -102,6 +147,7 @@ export class StatisticsService {
         ratings: satisfactionRatings,
         distribution: satisfactionDistribution,
       },
+      nearDeliveryOrders,
     };
   }
 }
