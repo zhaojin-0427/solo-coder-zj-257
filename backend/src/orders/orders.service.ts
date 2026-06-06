@@ -43,11 +43,15 @@ export class OrdersService {
     this.seedData();
   }
 
+  static readonly SEED_ORDER_1_ID = 'order-001-seed';
+  static readonly SEED_ORDER_2_ID = 'order-002-seed';
+  static readonly SEED_ORDER_3_ID = 'order-003-seed';
+
   private seedData() {
     const now = new Date();
     const sampleOrders: Order[] = [
       {
-        id: uuidv4(),
+        id: OrdersService.SEED_ORDER_1_ID,
         orderNo: 'WO-2026-001',
         customerName: '李明远',
         customerPhone: '13800138001',
@@ -72,7 +76,7 @@ export class OrdersService {
         ],
       },
       {
-        id: uuidv4(),
+        id: OrdersService.SEED_ORDER_2_ID,
         orderNo: 'WO-2026-002',
         customerName: '王若兰',
         customerPhone: '13900139002',
@@ -81,7 +85,7 @@ export class OrdersService {
         dimensions: { length: 180, width: 80, height: 82, unit: 'cm' },
         complexity: 'master',
         requiredTenons: ['霸王枨', '夹头榫', '抱肩榫', '粽角榫'],
-        status: 'completed',
+        status: 'accepted',
         createdAt: new Date(now.getTime() - 60 * 24 * 3600 * 1000).toISOString(),
         updatedAt: new Date(now.getTime() - 3 * 24 * 3600 * 1000).toISOString(),
         estimatedDelivery: new Date(now.getTime() - 5 * 24 * 3600 * 1000).toISOString(),
@@ -99,7 +103,7 @@ export class OrdersService {
         customerComment: '工艺精湛，紫檀画案做工一丝不苟，霸王枨结构稳固美观，非常满意！',
       },
       {
-        id: uuidv4(),
+        id: OrdersService.SEED_ORDER_3_ID,
         orderNo: 'WO-2026-003',
         customerName: '张文博',
         customerPhone: '13700137003',

@@ -37,7 +37,7 @@ export class MaterialsService {
     this.materialLists = [
       {
         id: uuidv4(),
-        orderId: 'seed-order-1',
+        orderId: 'order-001-seed',
         orderNo: 'WO-2026-001',
         status: 'confirmed',
         createdAt: new Date(now.getTime() - 19 * 24 * 3600 * 1000).toISOString(),
@@ -80,7 +80,7 @@ export class MaterialsService {
       },
       {
         id: uuidv4(),
-        orderId: 'seed-order-2',
+        orderId: 'order-002-seed',
         orderNo: 'WO-2026-002',
         status: 'purchased',
         createdAt: new Date(now.getTime() - 58 * 24 * 3600 * 1000).toISOString(),

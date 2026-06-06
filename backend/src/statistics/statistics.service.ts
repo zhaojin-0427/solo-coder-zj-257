@@ -62,9 +62,8 @@ export class StatisticsService {
           )
         : 0;
 
-    const acceptedOrders = orders.filter((o) => o.status === 'accepted');
-    const satisfactionRatings = acceptedOrders
-      .filter((o) => o.craftsmanshipRating)
+    const satisfactionRatings = orders
+      .filter((o) => o.craftsmanshipRating && (o.status === 'accepted' || o.status === 'completed'))
       .map((o) => ({
         orderNo: o.orderNo,
         furnitureName: o.furnitureName,

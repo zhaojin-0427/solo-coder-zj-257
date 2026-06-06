@@ -47,7 +47,7 @@ export class CraftsService {
       },
       {
         id: uuidv4(),
-        orderId: 'seed-order-1',
+        orderId: 'order-001-seed',
         orderNo: 'WO-2026-001',
         furnitureName: '明式圈椅',
         title: '明式黄花梨圈椅楔钉榫制作要点',
