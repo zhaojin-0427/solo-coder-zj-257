@@ -304,17 +304,17 @@ const editStep = (step: any) => {
 
 const saveStep = async () => {
   const payload: any = {
-    difficulty: stepForm.value.difficulty || undefined,
-    notes: stepForm.value.notes || undefined,
-    assignee: stepForm.value.assignee || undefined,
-    blockingReason: stepForm.value.blockingReason || undefined,
+    difficulty: stepForm.value.difficulty,
+    notes: stepForm.value.notes,
+    assignee: stepForm.value.assignee,
+    blockingReason: stepForm.value.blockingReason,
+    plannedStartDate: stepForm.value.plannedStartDate
+      ? new Date(stepForm.value.plannedStartDate).toISOString()
+      : '',
+    plannedEndDate: stepForm.value.plannedEndDate
+      ? new Date(stepForm.value.plannedEndDate).toISOString()
+      : '',
   };
-  if (stepForm.value.plannedStartDate) {
-    payload.plannedStartDate = new Date(stepForm.value.plannedStartDate).toISOString();
-  }
-  if (stepForm.value.plannedEndDate) {
-    payload.plannedEndDate = new Date(stepForm.value.plannedEndDate).toISOString();
-  }
   await orderApi.updateCraft(order.value.id, editingStep.value.id, payload);
   ElMessage.success('保存成功');
   showStepEdit.value = false;

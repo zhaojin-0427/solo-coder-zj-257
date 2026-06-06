@@ -184,6 +184,14 @@ export class OrdersService {
     };
   }
 
+  private findRawOrder(id: string): Order {
+    const order = this.orders.find((o) => o.id === id);
+    if (!order) {
+      throw new NotFoundException(`订单 ${id} 不存在`);
+    }
+    return order;
+  }
+
   findAll(scheduleStatus?: ScheduleStatus): OrderWithSchedule[] {
     const sorted = this.orders.sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -196,11 +204,7 @@ export class OrdersService {
   }
 
   findOne(id: string): OrderWithSchedule {
-    const order = this.orders.find((o) => o.id === id);
-    if (!order) {
-      throw new NotFoundException(`订单 ${id} 不存在`);
-    }
-    return this.enrichWithSchedule(order);
+    return this.enrichWithSchedule(this.findRawOrder(id));
   }
 
   create(dto: CreateOrderDto): Order {
@@ -237,37 +241,56 @@ export class OrdersService {
     return order;
   }
 
-  updateStatus(id: string, dto: UpdateOrderStatusDto): Order {
-    const order = this.findOne(id);
+  updateStatus(id: string, dto: UpdateOrderStatusDto): OrderWithSchedule {
+    const order = this.findRawOrder(id);
     order.status = dto.status;
     order.updatedAt = new Date().toISOString();
     if (dto.status === 'completed' && !order.actualDelivery) {
       order.actualDelivery = new Date().toISOString();
     }
-    return order;
+    return this.enrichWithSchedule(order);
   }
 
-  acceptOrder(id: string, dto: AcceptOrderDto): Order {
-    const order = this.findOne(id);
+  acceptOrder(id: string, dto: AcceptOrderDto): OrderWithSchedule {
+    const order = this.findRawOrder(id);
     order.status = 'accepted';
     order.craftsmanshipRating = dto.craftsmanshipRating;
     order.customerComment = dto.comment;
     order.updatedAt = new Date().toISOString();
-    return order;
+    return this.enrichWithSchedule(order);
   }
 
-  updateCraftRecord(orderId: string, craftId: string, data: Partial<CraftRecord>): Order {
-    const order = this.findOne(orderId);
+  updateCraftRecord(orderId: string, craftId: string, data: Partial<CraftRecord>): OrderWithSchedule {
+    const order = this.findRawOrder(orderId);
     const record = order.craftRecords.find((r) => r.id === craftId);
     if (!record) {
       throw new NotFoundException(`工序记录 ${craftId} 不存在`);
     }
-    Object.assign(record, data);
-    if (data.completed && !record.completedAt) {
-      record.completedAt = new Date().toISOString();
+    const clearableFields: (keyof CraftRecord)[] = [
+      'difficulty',
+      'notes',
+      'plannedStartDate',
+      'plannedEndDate',
+      'assignee',
+      'blockingReason',
+    ];
+    clearableFields.forEach((key) => {
+      if (key in data) {
+        const v = data[key];
+        (record as any)[key] = v === '' || v === null ? undefined : v;
+      }
+    });
+    if ('completed' in data) {
+      record.completed = data.completed as boolean;
+      if (data.completed && !record.completedAt) {
+        record.completedAt = new Date().toISOString();
+      }
+      if (!data.completed) {
+        record.completedAt = undefined;
+      }
     }
     order.updatedAt = new Date().toISOString();
-    return order;
+    return this.enrichWithSchedule(order);
   }
 
   delete(id: string): void {
