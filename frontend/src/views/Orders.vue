@@ -21,6 +21,12 @@
           <el-option label="⏰ 临近交付" value="near" />
           <el-option label="✅ 正常" value="normal" />
         </el-select>
+        <el-select v-model="quoteStatusFilter" placeholder="报价状态" clearable style="width: 160px">
+          <el-option label="未报价" value="unquoted" />
+          <el-option label="待确认" value="pending_confirm" />
+          <el-option label="已付订金" value="deposit_paid" />
+          <el-option label="已结清" value="settled" />
+        </el-select>
         <el-input
           v-model="searchText"
           placeholder="搜索订单号 / 客户 / 家具"
@@ -53,6 +59,13 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="报价状态" width="110">
+          <template #default="{ row }">
+            <el-tag :type="quoteStatusType(row.quoteStatus)" effect="dark" size="small">
+              {{ quoteStatusLabel(row.quoteStatus) }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="orderNo" label="订单号" width="140" />
         <el-table-column label="客户信息" width="180">
           <template #default="{ row }">
@@ -72,6 +85,22 @@
             <el-tag :type="complexityType(row.complexity)">
               {{ complexityLabel(row.complexity) }}
             </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="报价总额" width="130" align="right">
+          <template #default="{ row }">
+            <span v-if="row.quote" style="color: var(--primary-wood); font-weight: 600">
+              ¥{{ row.quote.totalAmount.toLocaleString() }}
+            </span>
+            <span v-else style="color: #bbb">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="订金" width="120" align="right">
+          <template #default="{ row }">
+            <span v-if="row.deposit" style="color: #67c23a; font-weight: 500">
+              ¥{{ row.deposit.amount.toLocaleString() }}
+            </span>
+            <span v-else style="color: #bbb">-</span>
           </template>
         </el-table-column>
         <el-table-column label="状态" width="100">
@@ -203,6 +232,7 @@ const router = useRouter();
 const orders = ref<any[]>([]);
 const statusFilter = ref('');
 const scheduleFilter = ref('');
+const quoteStatusFilter = ref('');
 const searchText = ref('');
 const showCreate = ref(false);
 const formRef = ref<FormInstance>();
@@ -224,6 +254,7 @@ const filteredOrders = computed(() => {
   return orders.value.filter((o) => {
     if (statusFilter.value && o.status !== statusFilter.value) return false;
     if (scheduleFilter.value && o.scheduleStatus !== scheduleFilter.value) return false;
+    if (quoteStatusFilter.value && o.quoteStatus !== quoteStatusFilter.value) return false;
     if (searchText.value) {
       const s = searchText.value.toLowerCase();
       return (
@@ -260,6 +291,20 @@ const statusType = (s: string) => ({
   producing: 'primary',
   completed: 'success',
   accepted: '',
+}[s] || '');
+
+const quoteStatusLabel = (s: string) => ({
+  unquoted: '未报价',
+  pending_confirm: '待确认',
+  deposit_paid: '已付订金',
+  settled: '已结清',
+}[s] || s);
+
+const quoteStatusType = (s: string) => ({
+  unquoted: 'info',
+  pending_confirm: 'warning',
+  deposit_paid: 'primary',
+  settled: 'success',
 }[s] || '');
 
 const complexityLabel = (c: string) => ({
@@ -339,6 +384,7 @@ onMounted(fetchOrders);
   display: flex;
   gap: 12px;
   margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 .text-danger {
   color: #f56c6c;

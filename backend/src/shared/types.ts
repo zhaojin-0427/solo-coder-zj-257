@@ -1,4 +1,5 @@
 export type OrderStatus = 'pending' | 'designing' | 'producing' | 'completed' | 'accepted';
+export type QuoteStatus = 'unquoted' | 'pending_confirm' | 'deposit_paid' | 'settled';
 export type WoodType = '黄花梨' | '紫檀' | '酸枝' | '鸡翅木' | '楠木' | '榆木' | '榉木' | '松木';
 export type Complexity = 'simple' | 'medium' | 'complex' | 'master';
 export type TenonType =

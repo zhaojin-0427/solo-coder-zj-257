@@ -1,6 +1,6 @@
-import { IsString, IsNotEmpty, IsOptional, IsEnum, IsArray, ValidateNested, IsNumber } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsEnum, IsArray, ValidateNested, IsNumber, IsObject } from 'class-validator';
 import { Type } from 'class-transformer';
-import { OrderStatus, WoodType, Complexity, TenonType } from '../shared/types';
+import { OrderStatus, QuoteStatus, WoodType, Complexity, TenonType } from '../shared/types';
 
 class DimensionDto {
   @IsNumber()
@@ -66,4 +66,62 @@ export class AcceptOrderDto {
   @IsString()
   @IsOptional()
   comment: string;
+}
+
+export class QuoteItemDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsString()
+  @IsOptional()
+  specification?: string;
+
+  @IsNumber()
+  quantity: number;
+
+  @IsString()
+  unit: string;
+
+  @IsNumber()
+  unitPrice: number;
+
+  @IsNumber()
+  totalPrice: number;
+
+  @IsString()
+  @IsOptional()
+  notes?: string;
+}
+
+export class UpdateQuoteDto {
+  @IsNumber()
+  @IsOptional()
+  laborCost?: number;
+
+  @IsNumber()
+  @IsOptional()
+  wastageCost?: number;
+
+  @IsNumber()
+  @IsOptional()
+  transportInstallCost?: number;
+
+  @IsString()
+  @IsOptional()
+  quoteRemark?: string;
+
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => QuoteItemDto)
+  items?: QuoteItemDto[];
+}
+
+export class ConfirmDepositDto {
+  @IsNumber()
+  depositRatio: number;
+
+  @IsNumber()
+  depositAmount: number;
 }

@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
-import { CreateOrderDto, UpdateOrderStatusDto, AcceptOrderDto } from './orders.dto';
-import { OrderStatus } from '../shared/types';
+import { CreateOrderDto, UpdateOrderStatusDto, AcceptOrderDto, UpdateQuoteDto, ConfirmDepositDto } from './orders.dto';
+import { OrderStatus, QuoteStatus } from '../shared/types';
+import { MaterialsService, MaterialItem } from '../materials/materials.service';
 
 export interface CraftRecord {
   id: string;
@@ -14,6 +15,38 @@ export interface CraftRecord {
   plannedEndDate?: string;
   assignee?: string;
   blockingReason?: string;
+}
+
+export interface QuoteItem {
+  id: string;
+  name: string;
+  specification?: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  totalPrice: number;
+  notes?: string;
+}
+
+export interface DepositRecord {
+  ratio: number;
+  amount: number;
+  confirmedAt: string;
+  paid: boolean;
+  paidAt?: string;
+}
+
+export interface Quote {
+  quoteNo: string;
+  items: QuoteItem[];
+  materialCost: number;
+  laborCost: number;
+  wastageCost: number;
+  transportInstallCost: number;
+  totalAmount: number;
+  quoteRemark?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type ScheduleStatus = 'overdue' | 'near' | 'normal';
@@ -44,19 +77,137 @@ export interface Order {
   craftRecords: CraftRecord[];
   craftsmanshipRating?: number;
   customerComment?: string;
+  quoteStatus: QuoteStatus;
+  quote?: Quote;
+  deposit?: DepositRecord;
 }
+
+const WOOD_PRICE_PER_UNIT: Record<string, number> = {
+  '黄花梨': 800,
+  '紫檀': 1200,
+  '酸枝': 400,
+  '鸡翅木': 300,
+  '楠木': 350,
+  '榆木': 150,
+  '榉木': 180,
+  '松木': 80,
+};
+
+const COMPLEXITY_LABOR_MULTIPLIER: Record<string, number> = {
+  'simple': 1.0,
+  'medium': 1.5,
+  'complex': 2.2,
+  'master': 3.5,
+};
+
+const BASE_LABOR_COST = 3000;
+const WASTAGE_RATE = 0.08;
+const TRANSPORT_INSTALL_BASE = 500;
 
 @Injectable()
 export class OrdersService {
   private orders: Order[] = [];
 
-  constructor() {
+  constructor(private readonly materialsService: MaterialsService) {
     this.seedData();
   }
 
   static readonly SEED_ORDER_1_ID = 'order-001-seed';
   static readonly SEED_ORDER_2_ID = 'order-002-seed';
   static readonly SEED_ORDER_3_ID = 'order-003-seed';
+
+  private computeVolume(dimensions: { length: number; width: number; height: number; unit: string }): number {
+    let factor = 1;
+    if (dimensions.unit === 'mm') factor = 0.1;
+    return (dimensions.length * factor) * (dimensions.width * factor) * (dimensions.height * factor) / 1000000;
+  }
+
+  private generateQuoteItems(order: Order, materialList?: any): QuoteItem[] {
+    const items: QuoteItem[] = [];
+
+    if (materialList && materialList.items && materialList.items.length > 0) {
+      materialList.items.forEach((m: MaterialItem) => {
+        items.push({
+          id: uuidv4(),
+          name: m.name,
+          specification: m.specification,
+          quantity: m.quantity,
+          unit: m.unit,
+          unitPrice: m.unitPrice,
+          totalPrice: m.totalPrice,
+          notes: m.notes,
+        });
+      });
+    } else {
+      const volume = this.computeVolume(order.dimensions);
+      const woodPricePerUnit = WOOD_PRICE_PER_UNIT[order.woodPreference] || 200;
+      const materialTotal = Math.round(volume * woodPricePerUnit * 100);
+
+      items.push({
+        id: uuidv4(),
+        name: `${order.woodPreference}主料`,
+        specification: `${order.dimensions.length}×${order.dimensions.width}×${order.dimensions.height}${order.dimensions.unit}`,
+        quantity: 1,
+        unit: '套',
+        unitPrice: materialTotal,
+        totalPrice: materialTotal,
+        notes: `按家具尺寸估算主料用量`,
+      });
+
+      if (order.requiredTenons && order.requiredTenons.length > 0) {
+        items.push({
+          id: uuidv4(),
+          name: '榫卯配件',
+          specification: order.requiredTenons.join('、'),
+          quantity: order.requiredTenons.length,
+          unit: '种',
+          unitPrice: 200,
+          totalPrice: order.requiredTenons.length * 200,
+        });
+      }
+
+      items.push({
+        id: uuidv4(),
+        name: '辅料（胶、漆、五金）',
+        specification: '标准配套',
+        quantity: 1,
+        unit: '套',
+        unitPrice: 800,
+        totalPrice: 800,
+      });
+    }
+
+    return items;
+  }
+
+  private autoGenerateQuote(order: Order): Quote {
+    const materialList = order.materialListId
+      ? this.materialsService.findOne(order.materialListId)
+      : this.materialsService.findByOrderId(order.id);
+
+    const items = this.generateQuoteItems(order, materialList);
+
+    const materialCost = items.reduce((sum, item) => sum + item.totalPrice, 0);
+    const laborMultiplier = COMPLEXITY_LABOR_MULTIPLIER[order.complexity] || 1.0;
+    const laborCost = Math.round(BASE_LABOR_COST * laborMultiplier);
+    const wastageCost = Math.round(materialCost * WASTAGE_RATE);
+    const volume = this.computeVolume(order.dimensions);
+    const transportInstallCost = Math.round(TRANSPORT_INSTALL_BASE + volume * 50);
+    const totalAmount = materialCost + laborCost + wastageCost + transportInstallCost;
+
+    const now = new Date().toISOString();
+    return {
+      quoteNo: `Q-${order.orderNo}`,
+      items,
+      materialCost,
+      laborCost,
+      wastageCost,
+      transportInstallCost,
+      totalAmount,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
 
   private seedData() {
     const now = new Date();
@@ -85,6 +236,7 @@ export class OrdersService {
           { id: 'c5', stepName: '打磨上漆', completed: false, plannedStartDate: new Date(now.getTime() + 1 * 24 * 3600 * 1000).toISOString(), plannedEndDate: new Date(now.getTime() + 4 * 24 * 3600 * 1000).toISOString(), assignee: '赵木匠' },
           { id: 'c6', stepName: '整体修整', completed: false, plannedStartDate: new Date(now.getTime() + 5 * 24 * 3600 * 1000).toISOString(), plannedEndDate: new Date(now.getTime() + 9 * 24 * 3600 * 1000).toISOString(), assignee: '王木匠' },
         ],
+        quoteStatus: 'deposit_paid',
       },
       {
         id: OrdersService.SEED_ORDER_2_ID,
@@ -112,6 +264,7 @@ export class OrdersService {
         ],
         craftsmanshipRating: 5,
         customerComment: '工艺精湛，紫檀画案做工一丝不苟，霸王枨结构稳固美观，非常满意！',
+        quoteStatus: 'settled',
       },
       {
         id: OrdersService.SEED_ORDER_3_ID,
@@ -129,8 +282,26 @@ export class OrdersService {
         estimatedDelivery: new Date(now.getTime() + 3 * 24 * 3600 * 1000).toISOString(),
         tenonDiagramIds: [],
         craftRecords: [],
+        quoteStatus: 'unquoted',
       },
     ];
+
+    sampleOrders.forEach((order) => {
+      if (order.quoteStatus !== 'unquoted') {
+        order.quote = this.autoGenerateQuote(order);
+        if (order.quoteStatus === 'deposit_paid' || order.quoteStatus === 'settled') {
+          const depositRatio = order.quoteStatus === 'settled' ? 100 : 30;
+          order.deposit = {
+            ratio: depositRatio,
+            amount: Math.round(order.quote.totalAmount * depositRatio / 100),
+            confirmedAt: new Date(now.getTime() - 15 * 24 * 3600 * 1000).toISOString(),
+            paid: true,
+            paidAt: new Date(now.getTime() - 14 * 24 * 3600 * 1000).toISOString(),
+          };
+        }
+      }
+    });
+
     this.orders = sampleOrders;
   }
 
@@ -192,10 +363,20 @@ export class OrdersService {
     return order;
   }
 
-  findAll(scheduleStatus?: ScheduleStatus): OrderWithSchedule[] {
-    const sorted = this.orders.sort(
+  private recalcQuoteTotal(quote: Quote): void {
+    const materialCost = quote.items.reduce((sum, item) => sum + item.totalPrice, 0);
+    quote.materialCost = materialCost;
+    quote.totalAmount = materialCost + quote.laborCost + quote.wastageCost + quote.transportInstallCost;
+    quote.updatedAt = new Date().toISOString();
+  }
+
+  findAll(scheduleStatus?: ScheduleStatus, quoteStatus?: QuoteStatus): OrderWithSchedule[] {
+    let sorted = [...this.orders].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
+    if (quoteStatus) {
+      sorted = sorted.filter((o) => o.quoteStatus === quoteStatus);
+    }
     const enriched = sorted.map((o) => this.enrichWithSchedule(o));
     if (scheduleStatus) {
       return enriched.filter((o) => o.scheduleStatus === scheduleStatus);
@@ -235,10 +416,102 @@ export class OrdersService {
       updatedAt: now,
       tenonDiagramIds: [],
       craftRecords,
+      quoteStatus: 'unquoted',
     };
 
     this.orders.push(order);
     return order;
+  }
+
+  createQuote(orderId: string): OrderWithSchedule {
+    const order = this.findRawOrder(orderId);
+    if (order.quote && order.quoteStatus !== 'unquoted') {
+      throw new BadRequestException('该订单已存在报价');
+    }
+    order.quote = this.autoGenerateQuote(order);
+    order.quoteStatus = 'pending_confirm';
+    order.updatedAt = new Date().toISOString();
+    return this.enrichWithSchedule(order);
+  }
+
+  updateQuote(orderId: string, dto: UpdateQuoteDto): OrderWithSchedule {
+    const order = this.findRawOrder(orderId);
+    if (!order.quote) {
+      throw new NotFoundException('该订单尚未创建报价');
+    }
+    if (order.quoteStatus === 'deposit_paid' || order.quoteStatus === 'settled') {
+      throw new BadRequestException('订金已确认，无法修改报价');
+    }
+
+    if (dto.laborCost !== undefined) order.quote.laborCost = dto.laborCost;
+    if (dto.wastageCost !== undefined) order.quote.wastageCost = dto.wastageCost;
+    if (dto.transportInstallCost !== undefined) order.quote.transportInstallCost = dto.transportInstallCost;
+    if (dto.quoteRemark !== undefined) order.quote.quoteRemark = dto.quoteRemark;
+
+    if (dto.items && dto.items.length > 0) {
+      order.quote.items = dto.items.map((item) => ({
+        ...item,
+        id: (item as any).id || uuidv4(),
+      }));
+    }
+
+    this.recalcQuoteTotal(order.quote);
+    order.updatedAt = new Date().toISOString();
+    order.quoteStatus = 'pending_confirm';
+    return this.enrichWithSchedule(order);
+  }
+
+  confirmDeposit(orderId: string, dto: ConfirmDepositDto): OrderWithSchedule {
+    const order = this.findRawOrder(orderId);
+    if (!order.quote) {
+      throw new NotFoundException('该订单尚未创建报价');
+    }
+    if (order.quoteStatus !== 'pending_confirm') {
+      throw new BadRequestException('当前报价状态不允许确认订金');
+    }
+    if (dto.depositRatio <= 0 || dto.depositRatio > 100) {
+      throw new BadRequestException('订金比例需在0-100之间');
+    }
+    const expectedAmount = Math.round(order.quote.totalAmount * dto.depositRatio / 100);
+    if (Math.abs(dto.depositAmount - expectedAmount) > 1) {
+      throw new BadRequestException(`订金金额与比例不匹配，应为${expectedAmount}`);
+    }
+
+    const now = new Date().toISOString();
+    order.deposit = {
+      ratio: dto.depositRatio,
+      amount: dto.depositAmount,
+      confirmedAt: now,
+      paid: true,
+      paidAt: now,
+    };
+
+    if (dto.depositRatio >= 100) {
+      order.quoteStatus = 'settled';
+    } else {
+      order.quoteStatus = 'deposit_paid';
+    }
+    order.updatedAt = now;
+    return this.enrichWithSchedule(order);
+  }
+
+  settleQuote(orderId: string): OrderWithSchedule {
+    const order = this.findRawOrder(orderId);
+    if (!order.quote || !order.deposit) {
+      throw new NotFoundException('该订单尚未完成报价和订金确认');
+    }
+    if (order.quoteStatus !== 'deposit_paid') {
+      throw new BadRequestException('当前状态不允许结清尾款');
+    }
+    const now = new Date().toISOString();
+    order.deposit.ratio = 100;
+    order.deposit.amount = order.quote.totalAmount;
+    order.deposit.confirmedAt = now;
+    order.deposit.paid = true;
+    order.deposit.paidAt = now;
+    order.quoteStatus = 'settled';
+    order.updatedAt = now;
+    return this.enrichWithSchedule(order);
   }
 
   updateStatus(id: string, dto: UpdateOrderStatusDto): OrderWithSchedule {

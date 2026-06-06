@@ -8,6 +8,9 @@
         订单详情 · {{ order?.orderNo }}
       </h2>
       <div>
+        <el-tag v-if="order" :type="quoteStatusType(order.quoteStatus)" effect="dark" size="large" style="margin-right: 8px">
+          {{ quoteStatusLabel(order.quoteStatus) }}
+        </el-tag>
         <el-tag v-if="order" :type="statusType(order.status)" size="large" style="margin-right: 8px">
           {{ statusLabel(order.status) }}
         </el-tag>
@@ -129,6 +132,144 @@
 
       <el-col :span="10">
         <div class="wood-card" style="margin-bottom: 16px">
+          <div class="card-header-row">
+            <h3 style="margin: 0; color: var(--primary-wood)">💰 报价单</h3>
+            <div>
+              <el-button
+                v-if="order.quoteStatus === 'unquoted'"
+                size="small"
+                type="primary"
+                class="wood-btn"
+                @click="handleCreateQuote"
+              >
+                生成报价
+              </el-button>
+              <el-button
+                v-if="order.quote && (order.quoteStatus === 'pending_confirm')"
+                size="small"
+                type="warning"
+                @click="showQuoteEdit = true"
+              >
+                调整费用
+              </el-button>
+              <el-button
+                v-if="order.quote && order.quoteStatus === 'pending_confirm'"
+                size="small"
+                type="primary"
+                class="wood-btn"
+                @click="showDepositConfirm = true"
+              >
+                确认订金
+              </el-button>
+              <el-button
+                v-if="order.quoteStatus === 'deposit_paid'"
+                size="small"
+                type="success"
+                @click="handleSettleQuote"
+              >
+                结清尾款
+              </el-button>
+            </div>
+          </div>
+
+          <div v-if="order.quote" style="margin-top: 16px">
+            <div class="quote-header">
+              <div>
+                <div class="quote-no">报价单号: {{ order.quote.quoteNo }}</div>
+                <div class="quote-date">生成时间: {{ formatDate(order.quote.createdAt) }}</div>
+              </div>
+            </div>
+
+            <el-table :data="order.quote.items" size="small" border style="margin-top: 12px">
+              <el-table-column prop="name" label="项目" />
+              <el-table-column prop="specification" label="规格" width="90" />
+              <el-table-column label="数量" width="70">
+                <template #default="{ row }">{{ row.quantity }}{{ row.unit }}</template>
+              </el-table-column>
+              <el-table-column label="单价" width="80" align="right">
+                <template #default="{ row }">¥{{ row.unitPrice.toLocaleString() }}</template>
+              </el-table-column>
+              <el-table-column label="小计" width="90" align="right">
+                <template #default="{ row }">¥{{ row.totalPrice.toLocaleString() }}</template>
+              </el-table-column>
+            </el-table>
+
+            <el-table size="small" border style="margin-top: 12px" :show-header="false">
+              <el-table-column width="120" />
+              <el-table-column align="right" />
+              <tr>
+                <td class="cost-label">材料费小计</td>
+                <td class="cost-value">¥{{ order.quote.materialCost.toLocaleString() }}</td>
+              </tr>
+              <tr>
+                <td class="cost-label">人工费</td>
+                <td class="cost-value">¥{{ order.quote.laborCost.toLocaleString() }}</td>
+              </tr>
+              <tr>
+                <td class="cost-label">损耗费</td>
+                <td class="cost-value">¥{{ order.quote.wastageCost.toLocaleString() }}</td>
+              </tr>
+              <tr>
+                <td class="cost-label">运输安装费</td>
+                <td class="cost-value">¥{{ order.quote.transportInstallCost.toLocaleString() }}</td>
+              </tr>
+              <tr class="total-row">
+                <td class="cost-label">报价总额</td>
+                <td class="cost-total">¥{{ order.quote.totalAmount.toLocaleString() }}</td>
+              </tr>
+            </el-table>
+
+            <div v-if="order.quote.quoteRemark" class="quote-remark">
+              <strong>备注：</strong>{{ order.quote.quoteRemark }}
+            </div>
+          </div>
+          <el-empty v-else description="尚未生成报价单，点击右上角「生成报价」按钮" :image-size="80" />
+        </div>
+
+        <div class="wood-card" style="margin-bottom: 16px">
+          <h3 style="margin-bottom: 16px; color: var(--primary-wood)">💵 订金记录</h3>
+          <div v-if="order.deposit">
+            <el-descriptions :column="1" border size="small">
+              <el-descriptions-item label="订金比例">
+                <el-tag type="primary">{{ order.deposit.ratio }}%</el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="订金金额">
+                <span style="color: #67c23a; font-size: 18px; font-weight: 600">
+                  ¥{{ order.deposit.amount.toLocaleString() }}
+                </span>
+              </el-descriptions-item>
+              <el-descriptions-item label="确认时间">
+                {{ formatDate(order.deposit.confirmedAt) }}
+              </el-descriptions-item>
+              <el-descriptions-item label="付款状态">
+                <el-tag v-if="order.deposit.paid" type="success">已付款</el-tag>
+                <el-tag v-else type="warning">待付款</el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="付款时间" v-if="order.deposit.paidAt">
+                {{ formatDate(order.deposit.paidAt) }}
+              </el-descriptions-item>
+            </el-descriptions>
+            <div v-if="order.quote" style="margin-top: 12px; padding: 12px; background: #f5f7fa; border-radius: 4px">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 6px">
+                <span style="color: #666">报价总额：</span>
+                <span>¥{{ order.quote.totalAmount.toLocaleString() }}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 6px">
+                <span style="color: #666">已收订金：</span>
+                <span style="color: #67c23a">¥{{ order.deposit.amount.toLocaleString() }}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-weight: 600; padding-top: 6px; border-top: 1px dashed #ddd">
+                <span>待收尾款：</span>
+                <span style="color: #e6a23c; font-size: 16px">
+                  ¥{{ (order.quote.totalAmount - order.deposit.amount).toLocaleString() }}
+                </span>
+              </div>
+            </div>
+          </div>
+          <el-empty v-else description="暂无订金记录" :image-size="60" />
+        </div>
+
+        <div class="wood-card" style="margin-bottom: 16px">
           <h3 style="margin-bottom: 16px; color: var(--primary-wood)">📊 用料清单</h3>
           <div v-if="materialList">
             <el-table :data="materialList.items" size="small" border>
@@ -212,13 +353,78 @@
         <el-button type="primary" class="wood-btn" @click="saveStep">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="showQuoteEdit" title="调整报价费用" width="600px" :close-on-click-modal="false">
+      <el-form :model="quoteForm" label-width="110px" v-if="order?.quote">
+        <el-form-item label="材料费小计">
+          <el-input :model-value="'¥' + quoteForm.materialCost.toLocaleString()" disabled />
+          <div style="font-size: 12px; color: #999; margin-top: 4px">根据用料清单自动计算</div>
+        </el-form-item>
+        <el-form-item label="人工费" required>
+          <el-input-number v-model="quoteForm.laborCost" :min="0" :step="100" controls-position="right" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="损耗费" required>
+          <el-input-number v-model="quoteForm.wastageCost" :min="0" :step="50" controls-position="right" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="运输安装费" required>
+          <el-input-number v-model="quoteForm.transportInstallCost" :min="0" :step="100" controls-position="right" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="报价备注">
+          <el-input v-model="quoteForm.quoteRemark" type="textarea" :rows="3" placeholder="可填写报价相关备注说明" />
+        </el-form-item>
+        <el-form-item label="报价总额">
+          <span style="font-size: 22px; color: var(--primary-wood); font-weight: 700">
+            ¥{{ computedQuoteTotal.toLocaleString() }}
+          </span>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showQuoteEdit = false">取消</el-button>
+        <el-button type="primary" class="wood-btn" @click="saveQuote">保存调整</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="showDepositConfirm" title="确认订金" width="480px" :close-on-click-modal="false">
+      <el-form :model="depositForm" label-width="100px" v-if="order?.quote">
+        <el-form-item label="报价总额">
+          <span style="font-size: 18px; color: var(--primary-wood); font-weight: 600">
+            ¥{{ order.quote.totalAmount.toLocaleString() }}
+          </span>
+        </el-form-item>
+        <el-form-item label="订金比例" required>
+          <el-radio-group v-model="depositForm.ratio">
+            <el-radio-button :value="30">30%</el-radio-button>
+            <el-radio-button :value="50">50%</el-radio-button>
+            <el-radio-button :value="100">100%</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="订金金额" required>
+          <el-input-number
+            v-model="depositForm.amount"
+            :min="0"
+            :max="order.quote.totalAmount"
+            :step="100"
+            controls-position="right"
+            style="width: 100%"
+            @change="onDepositAmountChange"
+          />
+          <div style="font-size: 12px; color: #999; margin-top: 4px">
+            按 {{ depositForm.ratio }}% 比例计算应为 ¥{{ computedDepositAmount.toLocaleString() }}
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showDepositConfirm = false">取消</el-button>
+        <el-button type="primary" class="wood-btn" @click="submitDepositConfirm">确认并付款</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { ArrowLeft } from '@element-plus/icons-vue';
 import { orderApi, materialApi } from '@/api';
 
@@ -236,10 +442,39 @@ const stepForm = ref({
   blockingReason: '',
 });
 const acceptForm = ref({ craftsmanshipRating: 5, comment: '' });
+const showQuoteEdit = ref(false);
+const showDepositConfirm = ref(false);
+const quoteForm = ref({
+  laborCost: 0,
+  wastageCost: 0,
+  transportInstallCost: 0,
+  materialCost: 0,
+  quoteRemark: '',
+  items: [] as any[],
+});
+const depositForm = ref({
+  ratio: 30,
+  amount: 0,
+});
 
 const activeStep = computed(() => {
   if (!order.value) return 0;
   return order.value.craftRecords.findIndex((s: any) => !s.completed);
+});
+
+const computedQuoteTotal = computed(() => {
+  return quoteForm.value.materialCost + quoteForm.value.laborCost + quoteForm.value.wastageCost + quoteForm.value.transportInstallCost;
+});
+
+const computedDepositAmount = computed(() => {
+  if (!order.value?.quote) return 0;
+  return Math.round(order.value.quote.totalAmount * depositForm.value.ratio / 100);
+});
+
+watch(() => depositForm.value.ratio, (val) => {
+  if (order.value?.quote) {
+    depositForm.value.amount = Math.round(order.value.quote.totalAmount * val / 100);
+  }
 });
 
 const fetchData = async () => {
@@ -254,6 +489,14 @@ const statusLabel = (s: string) => ({
 
 const statusType = (s: string) => ({
   pending: 'info', designing: 'warning', producing: 'primary', completed: 'success', accepted: '',
+}[s] || '');
+
+const quoteStatusLabel = (s: string) => ({
+  unquoted: '未报价', pending_confirm: '待确认', deposit_paid: '已付订金', settled: '已结清',
+}[s] || s);
+
+const quoteStatusType = (s: string) => ({
+  unquoted: 'info', pending_confirm: 'warning', deposit_paid: 'primary', settled: 'success',
 }[s] || '');
 
 const scheduleLabel = (s: string) => ({
@@ -327,6 +570,76 @@ const submitAccept = async () => {
   fetchData();
 };
 
+const handleCreateQuote = async () => {
+  try {
+    order.value = await orderApi.createQuote(order.value.id);
+    ElMessage.success('报价单已生成');
+  } catch (e) {}
+};
+
+watch(showQuoteEdit, (val) => {
+  if (val && order.value?.quote) {
+    quoteForm.value = {
+      laborCost: order.value.quote.laborCost,
+      wastageCost: order.value.quote.wastageCost,
+      transportInstallCost: order.value.quote.transportInstallCost,
+      materialCost: order.value.quote.materialCost,
+      quoteRemark: order.value.quote.quoteRemark || '',
+      items: JSON.parse(JSON.stringify(order.value.quote.items || [])),
+    };
+  }
+});
+
+const saveQuote = async () => {
+  try {
+    order.value = await orderApi.updateQuote(order.value.id, {
+      laborCost: quoteForm.value.laborCost,
+      wastageCost: quoteForm.value.wastageCost,
+      transportInstallCost: quoteForm.value.transportInstallCost,
+      quoteRemark: quoteForm.value.quoteRemark,
+      items: quoteForm.value.items,
+    });
+    ElMessage.success('报价已更新');
+    showQuoteEdit.value = false;
+  } catch (e) {}
+};
+
+watch(showDepositConfirm, (val) => {
+  if (val && order.value?.quote) {
+    depositForm.value = {
+      ratio: 30,
+      amount: Math.round(order.value.quote.totalAmount * 0.3),
+    };
+  }
+});
+
+const onDepositAmountChange = () => {
+  if (!order.value?.quote) return;
+  const ratio = Math.round(depositForm.value.amount / order.value.quote.totalAmount * 100);
+  if ([30, 50, 100].includes(ratio)) {
+    depositForm.value.ratio = ratio;
+  }
+};
+
+const submitDepositConfirm = async () => {
+  try {
+    order.value = await orderApi.confirmDeposit(order.value.id, {
+      depositRatio: depositForm.value.ratio,
+      depositAmount: depositForm.value.amount,
+    });
+    ElMessage.success('订金已确认');
+    showDepositConfirm.value = false;
+  } catch (e) {}
+};
+
+const handleSettleQuote = async () => {
+  try {
+    await ElMessageBox.confirm('确定已收到全部尾款并结清该订单？', '确认结清', { type: 'warning' });
+    order.value = await orderApi.settleQuote(order.value.id);
+    ElMessage.success('已结清尾款');
+  } catch (e) {}
+};
+
 onMounted(fetchData);
 </script>
 
@@ -350,5 +663,62 @@ onMounted(fetchData);
 .step-overdue :deep(.el-step__title) {
   color: #f56c6c !important;
   font-weight: 600;
+}
+.card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.quote-header {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #faf6ef 0%, #f5f1ea 100%);
+  border-radius: 6px;
+  border: 1px solid var(--border-wood);
+}
+.quote-no {
+  font-weight: 600;
+  color: var(--primary-wood);
+  font-size: 14px;
+}
+.quote-date {
+  font-size: 12px;
+  color: #888;
+  margin-top: 4px;
+}
+.cost-label {
+  color: #666;
+  padding: 8px 12px !important;
+  background: #fafafa;
+  font-size: 13px;
+}
+.cost-value {
+  padding: 8px 12px !important;
+  font-size: 13px;
+}
+.total-row .cost-label {
+  background: var(--bg-paper);
+  font-weight: 600;
+  color: var(--primary-wood);
+  font-size: 14px;
+}
+.cost-total {
+  padding: 8px 12px !important;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary-wood);
+}
+.quote-remark {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #fff9e6;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #8b6914;
+  line-height: 1.6;
+}
+:deep(.el-table__body tr:last-child td) {
+  border-bottom: 1px solid #ebeef5;
 }
 </style>

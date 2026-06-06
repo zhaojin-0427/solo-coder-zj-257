@@ -127,6 +127,31 @@ export class StatisticsService {
         overdueCraftCount: o.overdueCraftCount,
       }));
 
+    const quotedOrders = orders.filter((o) => o.quote);
+    const totalQuoteAmount = quotedOrders.reduce((sum, o) => sum + (o.quote?.totalAmount || 0), 0);
+    const totalDepositReceived = quotedOrders.reduce((sum, o) => sum + (o.deposit?.amount || 0), 0);
+    const totalPendingBalance = totalQuoteAmount - totalDepositReceived;
+
+    const woodAvgQuotes: Record<string, { total: number; count: number }> = {};
+    quotedOrders.forEach((o) => {
+      const wood = o.woodPreference;
+      if (!woodAvgQuotes[wood]) woodAvgQuotes[wood] = { total: 0, count: 0 };
+      woodAvgQuotes[wood].total += o.quote?.totalAmount || 0;
+      woodAvgQuotes[wood].count += 1;
+    });
+    const woodAverageQuotes = Object.entries(woodAvgQuotes).map(([name, data]) => ({
+      name,
+      average: data.count > 0 ? Math.round(data.total / data.count) : 0,
+      count: data.count,
+    }));
+
+    const quoteStatusCounts = {
+      unquoted: orders.filter((o) => o.quoteStatus === 'unquoted').length,
+      pending_confirm: orders.filter((o) => o.quoteStatus === 'pending_confirm').length,
+      deposit_paid: orders.filter((o) => o.quoteStatus === 'deposit_paid').length,
+      settled: orders.filter((o) => o.quoteStatus === 'settled').length,
+    };
+
     return {
       overview: {
         totalOrders,
@@ -148,6 +173,13 @@ export class StatisticsService {
         distribution: satisfactionDistribution,
       },
       nearDeliveryOrders,
+      quotation: {
+        totalQuoteAmount,
+        totalDepositReceived,
+        totalPendingBalance,
+        woodAverageQuotes,
+        statusCounts: quoteStatusCounts,
+      },
     };
   }
 }

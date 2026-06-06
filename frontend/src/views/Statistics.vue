@@ -59,6 +59,44 @@
       </el-col>
     </el-row>
 
+    <el-row :gutter="16" style="margin-bottom: 16px">
+      <el-col :span="6">
+        <div class="stat-card wood-card stat-card-primary">
+          <div class="stat-label">💰 报价总额</div>
+          <div class="stat-value" style="color: var(--primary-wood)">
+            ¥{{ (data?.quotation?.totalQuoteAmount || 0).toLocaleString() }}
+          </div>
+        </div>
+      </el-col>
+      <el-col :span="6">
+        <div class="stat-card wood-card stat-card-success">
+          <div class="stat-label">✅ 已收订金</div>
+          <div class="stat-value" style="color: #67c23a">
+            ¥{{ (data?.quotation?.totalDepositReceived || 0).toLocaleString() }}
+          </div>
+        </div>
+      </el-col>
+      <el-col :span="6">
+        <div class="stat-card wood-card stat-card-warning">
+          <div class="stat-label">⏳ 待收尾款</div>
+          <div class="stat-value" style="color: #e6a23c">
+            ¥{{ (data?.quotation?.totalPendingBalance || 0).toLocaleString() }}
+          </div>
+        </div>
+      </el-col>
+      <el-col :span="6">
+        <div class="stat-card wood-card">
+          <div class="stat-label">📊 报价状态</div>
+          <div class="quote-status-row">
+            <el-tag type="info" size="small">未 {{ data?.quotation?.statusCounts?.unquoted || 0 }}</el-tag>
+            <el-tag type="warning" size="small">待 {{ data?.quotation?.statusCounts?.pending_confirm || 0 }}</el-tag>
+            <el-tag type="primary" size="small">订 {{ data?.quotation?.statusCounts?.deposit_paid || 0 }}</el-tag>
+            <el-tag type="success" size="small">结 {{ data?.quotation?.statusCounts?.settled || 0 }}</el-tag>
+          </div>
+        </div>
+      </el-col>
+    </el-row>
+
     <el-row :gutter="16">
       <el-col :span="12">
         <div class="wood-card chart-card">
@@ -85,6 +123,21 @@
         <div class="wood-card chart-card">
           <h3 class="chart-title">⭐ 客户满意度分布</h3>
           <div ref="satisfactionChartRef" class="chart"></div>
+        </div>
+      </el-col>
+    </el-row>
+
+    <el-row :gutter="16" style="margin-top: 16px">
+      <el-col :span="12">
+        <div class="wood-card chart-card">
+          <h3 class="chart-title">🪵 不同木料订单平均报价</h3>
+          <div ref="woodAvgQuoteChartRef" class="chart"></div>
+        </div>
+      </el-col>
+      <el-col :span="12">
+        <div class="wood-card chart-card">
+          <h3 class="chart-title">💴 报价收款概览</h3>
+          <div ref="quoteOverviewChartRef" class="chart"></div>
         </div>
       </el-col>
     </el-row>
@@ -151,6 +204,8 @@ const woodChartRef = ref<HTMLElement>();
 const tenonChartRef = ref<HTMLElement>();
 const deliveryChartRef = ref<HTMLElement>();
 const satisfactionChartRef = ref<HTMLElement>();
+const woodAvgQuoteChartRef = ref<HTMLElement>();
+const quoteOverviewChartRef = ref<HTMLElement>();
 
 const woodColors = ['#8b5a2b', '#a67c52', '#6b4226', '#c9a066', '#8b6914', '#5c4033', '#8b4513', '#cd853f'];
 
@@ -346,6 +401,96 @@ const initCharts = () => {
       ],
     });
   }
+
+  if (woodAvgQuoteChartRef.value && data.value.quotation?.woodAverageQuotes) {
+    const chart = echarts.init(woodAvgQuoteChartRef.value);
+    const woodData = data.value.quotation.woodAverageQuotes;
+    chart.setOption({
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        formatter: (params: any) => {
+          const p = params[0];
+          const item = woodData[p.dataIndex];
+          return `${p.name}<br/>平均报价: ¥${p.value.toLocaleString()}<br/>订单数: ${item.count} 单`;
+        },
+      },
+      grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '3%',
+        containLabel: true,
+      },
+      xAxis: {
+        type: 'category',
+        data: woodData.map((d: any) => d.name),
+        axisLine: { lineStyle: { color: '#c9a066' } },
+      },
+      yAxis: {
+        type: 'value',
+        name: '平均报价 (¥)',
+        axisLine: { lineStyle: { color: '#c9a066' } },
+        axisLabel: {
+          formatter: (val: number) => '¥' + (val / 1000) + 'k',
+        },
+      },
+      series: [
+        {
+          type: 'bar',
+          data: woodData.map((d: any) => d.average),
+          itemStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: '#a67c52' },
+              { offset: 1, color: '#8b5a2b' },
+            ]),
+            borderRadius: [6, 6, 0, 0],
+          },
+          label: {
+            show: true,
+            position: 'top',
+            formatter: (p: any) => '¥' + (p.value / 1000).toFixed(1) + 'k',
+          },
+          barWidth: 36,
+        },
+      ],
+    });
+  }
+
+  if (quoteOverviewChartRef.value && data.value.quotation) {
+    const chart = echarts.init(quoteOverviewChartRef.value);
+    chart.setOption({
+      tooltip: {
+        trigger: 'item',
+        formatter: '{b}: ¥{c} ({d}%)',
+      },
+      legend: {
+        bottom: 0,
+        type: 'scroll',
+      },
+      color: ['#67c23a', '#e6a23c', '#909399'],
+      series: [
+        {
+          type: 'pie',
+          radius: ['40%', '70%'],
+          center: ['50%', '45%'],
+          avoidLabelOverlap: false,
+          itemStyle: {
+            borderRadius: 6,
+            borderColor: '#fff',
+            borderWidth: 2,
+          },
+          label: {
+            show: true,
+            formatter: '{b}\n¥{c}',
+          },
+          data: [
+            { name: '已收订金', value: data.value.quotation.totalDepositReceived || 0 },
+            { name: '待收尾款', value: data.value.quotation.totalPendingBalance || 0 },
+          ],
+        },
+      ],
+    });
+  }
 };
 
 onMounted(async () => {
@@ -354,7 +499,7 @@ onMounted(async () => {
   initCharts();
 
   window.addEventListener('resize', () => {
-    [woodChartRef, tenonChartRef, deliveryChartRef, satisfactionChartRef].forEach((ref) => {
+    [woodChartRef, tenonChartRef, deliveryChartRef, satisfactionChartRef, woodAvgQuoteChartRef, quoteOverviewChartRef].forEach((ref) => {
       if (ref.value) echarts.getInstanceByDom(ref.value)?.resize();
     });
   });
@@ -365,6 +510,19 @@ onMounted(async () => {
 .stat-card {
   text-align: center;
   padding: 20px 8px;
+  transition: transform 0.2s;
+}
+.stat-card:hover {
+  transform: translateY(-2px);
+}
+.stat-card-primary {
+  background: linear-gradient(135deg, #fff 0%, #faf6ef 100%);
+}
+.stat-card-success {
+  background: linear-gradient(135deg, #fff 0%, #f0f9eb 100%);
+}
+.stat-card-warning {
+  background: linear-gradient(135deg, #fff 0%, #fdf6ec 100%);
 }
 .stat-label {
   font-size: 13px;
@@ -387,6 +545,13 @@ onMounted(async () => {
 }
 .stat-value.danger {
   color: #f56c6c;
+}
+.quote-status-row {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 4px;
 }
 .chart-card {
   padding: 20px;

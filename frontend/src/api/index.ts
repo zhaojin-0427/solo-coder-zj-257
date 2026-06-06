@@ -15,8 +15,8 @@ request.interceptors.response.use(
 );
 
 export const orderApi = {
-  list: (scheduleStatus?: string) =>
-    request.get('/orders', { params: scheduleStatus ? { scheduleStatus } : undefined }),
+  list: (params?: { scheduleStatus?: string; quoteStatus?: string }) =>
+    request.get('/orders', { params }),
   detail: (id: string) => request.get(`/orders/${id}`),
   create: (data: any) => request.post('/orders', data),
   updateStatus: (id: string, status: string) =>
@@ -25,6 +25,10 @@ export const orderApi = {
   updateCraft: (orderId: string, craftId: string, data: any) =>
     request.patch(`/orders/${orderId}/craft/${craftId}`, data),
   delete: (id: string) => request.delete(`/orders/${id}`),
+  createQuote: (id: string) => request.post(`/orders/${id}/quote`),
+  updateQuote: (id: string, data: any) => request.put(`/orders/${id}/quote`, data),
+  confirmDeposit: (id: string, data: any) => request.post(`/orders/${id}/deposit`, data),
+  settleQuote: (id: string) => request.post(`/orders/${id}/settle`),
 };
 
 export const materialApi = {
